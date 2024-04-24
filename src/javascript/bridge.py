@@ -19,6 +19,7 @@ class JSBridge:
         self.globalThis = self.global_jsi.globalThis
         self.RegExp = self.global_jsi.RegExp
         self.fast_mode = False
+        self.node_emitter_patches = False
         if self.global_jsi.needsNodePatches():
             self.node_emitter_patches = True
 
