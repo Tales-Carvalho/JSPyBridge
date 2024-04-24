@@ -45,8 +45,8 @@ class EventExecutorThread(threading.Thread):
 # only one thread can run Python at a time, so no race conditions to worry about.
 class EventLoop:
 
-    def __init__(self):
-        connection.start()
+    def __init__(self, js_process):
+        self.conn = connection.Connection(js_process)
 
         self.active = True
         self.freeable = []
@@ -72,10 +72,10 @@ class EventLoop:
 
         self.callbackExecutor = EventExecutorThread()
         self.callbackExecutor.start()
-        self.pyi = pyi.PyInterface(self, config.executor)
+        self.pyi: pyi.PyInterface | None = None
 
     def stop(self):
-        connection.stop()
+        self.conn.stop()
 
     # === THREADING ===
     def newTaskThread(self, handler, *args):
@@ -141,7 +141,7 @@ class EventLoop:
     def on_exit(self):
         if len(self.callbacks):
             config.debug("cannot exit because active callback", self.callbacks)
-        while len(self.callbacks) and connection.is_alive():
+        while len(self.callbacks) and self.conn.is_alive():
             time.sleep(0.4)
         time.sleep(0.4)  # Allow final IO
         self.callbackExecutor.running = False
@@ -156,7 +156,7 @@ class EventLoop:
             self.queue.empty()
 
             # Send the next outbound request batch
-            connection.writeAll(self.outbound)
+            self.conn.writeAll(self.outbound)
             self.outbound = []
 
             # Iterate over the open threads and check if any have been killed, if so
@@ -168,7 +168,7 @@ class EventLoop:
                 self.freeable = []
 
             # Read the inbound data and route it to correct handler
-            inbounds = connection.readAll()
+            inbounds = self.conn.readAll()
             for inbound in inbounds:
                 r = inbound["r"]
                 cbid = inbound["cb"] if "cb" in inbound else None

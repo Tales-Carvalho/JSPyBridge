@@ -7,9 +7,9 @@ debug = config.debug
 # This is the Executor, something that sits in the middle of the Bridge and is the interface for
 # Python to JavaScript. This is also used by the bridge to call Python from Node.js.
 class Executor:
-    def __init__(self, loop):
+    def __init__(self, loop, event_thread):
         self.loop = loop
-        loop.pyi.executor = self
+        self.event_thread = event_thread
         self.queue = loop.queue_request
         self.i = 0
         self.bridge = self.loop.pyi
@@ -37,9 +37,9 @@ class Executor:
             assert False, f"Unhandled action '{action}'"
 
         if not l.wait(10):
-            if not config.event_thread:
+            if not self.event_thread:
                 print(config.dead)
-            print("Timed out", action, ffid, attr, repr(config.event_thread))
+            print("Timed out", action, ffid, attr, repr(self.event_thread))
             raise Exception(f"Timed out accessing '{attr}'")
         res, barrier = self.loop.responses[r]
         del self.loop.responses[r]
@@ -132,7 +132,7 @@ class Executor:
             barrier.wait()
 
         if not l.wait(timeout):
-            if not config.event_thread:
+            if not self.event_thread:
                 print(config.dead)
             raise Exception(
                 f"Call to '{attr}' timed out. Increase the timeout by setting the `timeout` keyword argument."
